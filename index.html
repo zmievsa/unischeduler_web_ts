@@ -130,7 +130,7 @@
           $('#divError').prop("style", "display: none;")
           $('#submit-btn').prop("value", "Submit")
           try {
-            schedule = parseShedule($('textarea[name="schedule"]').val(), $('input[name="isUCF"]').prop("checked"))
+            schedule = convertToIcal($('textarea[name="schedule"]').val(), $('input[name="isUCF"]').prop("checked"))
             save(data.result, "Classes.ics", "text/calendar")
           } catch (error) {
             $('#error').text(error)
