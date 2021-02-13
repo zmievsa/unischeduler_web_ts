@@ -131,7 +131,7 @@
           $('#submit-btn').prop("value", "Submit")
           try {
             schedule = convertToIcal($('textarea[name="schedule"]').val(), $('input[name="isUCF"]').prop("checked"))
-            save(data.result, "Classes.ics", "text/calendar")
+            save(schedule, "Classes.ics", "text/calendar")
           } catch (error) {
             $('#error').text(error)
             $('#divError').prop("style", "display: inline-block;")
