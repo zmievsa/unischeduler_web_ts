@@ -1,3 +1,23 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -7,11 +27,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-// @ts-ignore
-import * as ical from "./node_modules/ical-generator/";
-import axios from './node_modules/axios';
-// @ts-ignore
-import JSSoup from './node_modules/jssoup';
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const ical = __importStar(require("./node_modules/ical-generator/"));
+const axios_1 = __importDefault(require("./node_modules/axios"));
+const jssoup_1 = __importDefault(require("./node_modules/jssoup"));
 // Good luck figuring this out!
 const reClassName = /[A-Z]{3}[A-Z]* \d+[A-Z]? - .+/g;
 const reClassSection = /(?:(?<sectionType>[A-Z][a-z]+)\n)?(?<weekdays>(?:[A-Z][a-z])+)\s+(?<startTime>\d\d?:\d\d(?:AM|PM))\s+-\s+(?<endTime>\d\d?:\d\d(?:AM|PM))\n(?<location>.+)\n(?<professors>\D+)(?<dtstart>[\d/]+)\s+-\s+(?<dtend>[\d/]+)/;
@@ -164,12 +186,12 @@ function scrap_no_school_events(year, term) {
         const url = `https://calendar.ucf.edu/${year}/${term}/no-classes/`;
         let response;
         try {
-            response = yield axios.get(url);
+            response = yield axios_1.default.get(url);
         }
         catch (exception) {
             throw new SchedulerError("Couldn't connect to calendar.ucf.edu to get no-school events. Either check your internet connection and try again or uncheck 'I am a UCF student' tickbox.");
         }
-        let soup = new JSSoup(response.data, false);
+        let soup = new jssoup_1.default(response.data, false);
         let raw_events = soup.findAll("tr", { "class": "vevent" });
         let scrapped_events = [];
         let dtstart, dtend, description;

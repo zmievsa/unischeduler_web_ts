@@ -1,7 +1,5 @@
-// @ts-ignore
 import * as ical from "./node_modules/ical-generator/"
 import axios, { AxiosResponse } from './node_modules/axios';
-// @ts-ignore
 import JSSoup from './node_modules/jssoup';
 
 // Good luck figuring this out!
@@ -141,14 +139,14 @@ function add_exdates(icalEvent: ClassSectionEvent, exdates: Date[]) {
 
 function parseSchedule(schedule: string): ClassSectionEvent[] {
     schedule = normalizeWhitespace(schedule);
-    console.log(schedule)
+    // console.log(schedule)
     const classNames = schedule.match(reClassName)
-    console.log(classNames)
+    // console.log(classNames)
     if (!classNames)
         throw new SchedulerError("Couldn't find any class sections in your schedule. Please, check your schedule or contact my author.")
     const classSectionBatches = schedule.split(reClassName);
-    console.log(classSectionBatches)
-    console.log(classSectionBatches.length)
+    // console.log(classSectionBatches)
+    // console.log(classSectionBatches.length)
     classSectionBatches.shift() // classSectionBatches[0] == ''
     let all_class_sections = [];
     for (let i = 0; i < classNames.length; i++) {
