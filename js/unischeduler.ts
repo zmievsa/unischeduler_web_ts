@@ -1,6 +1,8 @@
-import * as ical from "ical-generator"
-import axios, { AxiosResponse } from 'axios';
-import JSSoup from 'jssoup';
+// @ts-ignore
+import * as ical from "./node_modules/ical-generator/"
+import axios, { AxiosResponse } from './node_modules/axios';
+// @ts-ignore
+import JSSoup from './node_modules/jssoup';
 
 // Good luck figuring this out!
 const reClassName = /[A-Z]{3}[A-Z]* \d+[A-Z]? - .+/g;
@@ -33,15 +35,21 @@ interface IcalEvent {
     summary: string;
     start: Date;
     end: Date;
-    location?: string;
-    description?: string;
-    repeating?: ical.RepeatingData
+    description: string;
+}
+
+interface ClassSectionEvent extends IcalEvent {
+    summary: string;
+    start: Date;
+    end: Date;
+    location: string;
+    repeating: ical.RepeatingData
 }
 
 function createClassSection(
     className: string, type: string, weekdays: string,
     startTime: string, endTime: string, location: string,
-    professors: string, dtstart: string, dtend: string): IcalEvent {
+    professors: string, dtstart: string, dtend: string): ClassSectionEvent {
     let byDay: any = weekdays.match(/../g); // type: day[]
     return {
         summary: `${className} ${type}`,
@@ -58,7 +66,9 @@ function createClassSection(
 }
 
 function makeDateTime(date: string, time: string) {
-    let timeInfo = reClassTime.exec(time).groups;
+    let timeInfo = reClassTime.exec(time)?.groups;
+    if (!timeInfo)
+        throw new SchedulerError("TIMEINFO ERROR");
     let datetime = new Date(date);
     datetime.setHours(parseInt(timeInfo.hours) + (timeInfo.isAfterNoon ? 12 : 0));
     datetime.setMinutes(parseInt(timeInfo.minutes));
@@ -77,7 +87,7 @@ async function convertToIcal(schedule: string, isUCF: boolean) {
     let firstSectionStartDate = class_sections[0].start;
     let year = firstSectionStartDate.getFullYear();
     let term = getSectionTerm(firstSectionStartDate);
-    let no_school_events;
+    let no_school_events: IcalEvent[];
     if (isUCF)
         no_school_events = await scrap_no_school_events(year, term);
     else
@@ -85,7 +95,7 @@ async function convertToIcal(schedule: string, isUCF: boolean) {
     let exdates = make_timeless_exdates(no_school_events);
     for (let section of class_sections)
         add_exdates(section, exdates);
-    return ical({ name: `Classes ${term} ${year}`, timezone: TZ_NEW_YORK }).toString();
+    return new ical.ICalCalendar({ name: `Classes ${term} ${year}`, timezone: TZ_NEW_YORK }).toString();
 }
 
 function getSectionTerm(sectionDate: Date): string {
@@ -115,7 +125,7 @@ function make_timeless_exdates(no_school_events: IcalEvent[]): Date[] {
     return dates;
 }
 
-function add_exdates(icalEvent: IcalEvent, exdates: Date[]) {
+function add_exdates(icalEvent: ClassSectionEvent, exdates: Date[]) {
     let hours = icalEvent.start.getHours();
     let minutes = icalEvent.start.getMinutes();
     let exdatesCopies = [];
@@ -129,10 +139,16 @@ function add_exdates(icalEvent: IcalEvent, exdates: Date[]) {
 }
 // PARSING
 
-function parseSchedule(schedule: string): IcalEvent[] {
+function parseSchedule(schedule: string): ClassSectionEvent[] {
     schedule = normalizeWhitespace(schedule);
-    const classNames = schedule.match(reClassName)// getAllRegexMatches(schedule, reSummary);
+    console.log(schedule)
+    const classNames = schedule.match(reClassName)
+    console.log(classNames)
+    if (!classNames)
+        throw new SchedulerError("Couldn't find any class sections in your schedule. Please, check your schedule or contact my author.")
     const classSectionBatches = schedule.split(reClassName);
+    console.log(classSectionBatches)
+    console.log(classSectionBatches.length)
     classSectionBatches.shift() // classSectionBatches[0] == ''
     let all_class_sections = [];
     for (let i = 0; i < classNames.length; i++) {
@@ -143,10 +159,10 @@ function parseSchedule(schedule: string): IcalEvent[] {
             continue;
         let sectionBatch = getAllRegexMatches(rawSectionBatch, reClassSection)
         let sectionType: string;
-        let lastSectionType: string;
+        let lastSectionType: string = "";
         for (let section of sectionBatch) {
-            let info = section.groups;
-            if (sectionType = info?.sectionType)
+            let info: any = section.groups;
+            if (sectionType = info.sectionType)
                 lastSectionType = sectionType;
             all_class_sections.push(createClassSection(
                 classNames[i], lastSectionType, info.weekdays,
@@ -164,7 +180,7 @@ function normalizeWhitespace(str: string): string {
 
 function getAllRegexMatches(str: string, regex: RegExp): RegExpExecArray[] {
     let matches: RegExpExecArray[] = [];
-    let match: RegExpExecArray;
+    let match: RegExpExecArray | null;
     while ((match = regex.exec(str)) !== null)
         matches.push(match);
     return matches;
@@ -175,7 +191,7 @@ function getAllRegexMatches(str: string, regex: RegExp): RegExpExecArray[] {
 // def get_no_school_events(year, term):
 //     return [RegularEvent(**e) for e in scrap_no_school_events(year, term)]
 
-async function scrap_no_school_events(year, term): Promise<IcalEvent[]> {
+async function scrap_no_school_events(year: number, term: string): Promise<IcalEvent[]> {
     const url = `https://calendar.ucf.edu/${year}/${term}/no-classes/`;
     let response: AxiosResponse<any>;
     try {
@@ -185,7 +201,7 @@ async function scrap_no_school_events(year, term): Promise<IcalEvent[]> {
     }
     let soup = new JSSoup(response.data, false)
     let raw_events = soup.findAll("tr", { "class": "vevent" })
-    let scrapped_events = []
+    let scrapped_events: IcalEvent[] = []
     let dtstart, dtend, description;
     for (let raw_event of raw_events) {
         dtstart = dtend = description = null;
@@ -207,9 +223,8 @@ async function scrap_no_school_events(year, term): Promise<IcalEvent[]> {
             summary: raw_event.find("span", { "class": "summary" }).getText(),
             start: new Date(dtstart),
             end: new Date(dtend),
+            description: description ? description : "",
         })
-        if (description)
-            scrapped_events[scrapped_events.length - 1]['description'] = description;
     }
     return scrapped_events
 }
