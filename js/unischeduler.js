@@ -1,42 +1,8 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const ical = __importStar(require("./node_modules/ical-generator/"));
-const axios_1 = __importDefault(require("./node_modules/axios"));
-const jssoup_1 = __importDefault(require("./node_modules/jssoup"));
+const ical = require("ical-generator");
+const jssoup = require('jssoup').default;
 // Good luck figuring this out!
 const reClassName = /[A-Z]{3}[A-Z]* \d+[A-Z]? - .+/g;
-const reClassSection = /(?:(?<sectionType>[A-Z][a-z]+)\n)?(?<weekdays>(?:[A-Z][a-z])+)\s+(?<startTime>\d\d?:\d\d(?:AM|PM))\s+-\s+(?<endTime>\d\d?:\d\d(?:AM|PM))\n(?<location>.+)\n(?<professors>\D+)(?<dtstart>[\d/]+)\s+-\s+(?<dtend>[\d/]+)/;
+const reClassSection = /(?:(?<sectionType>[A-Z][a-z]+)\n)?(?<weekdays>(?:[A-Z][a-z])+)\s+(?<startTime>\d\d?:\d\d(?:AM|PM))\s+-\s+(?<endTime>\d\d?:\d\d(?:AM|PM))\n(?<location>.+)\n(?<professors>\D+)(?<dtstart>[\d/]+)\s+-\s+(?<dtend>[\d/]+)/g;
 // Yes, they MUST be separate and CANNOT be combined
 // Otherwise, js can sometimes remove necessary newlines
 const reLeadingLineWhitespace = /(^\s+)/gm;
@@ -60,7 +26,7 @@ function createClassSection(className, type, weekdays, startTime, endTime, locat
         start: makeDateTime(dtstart, startTime),
         end: makeDateTime(dtstart, endTime),
         location: location,
-        description: "Professors: " + professors.replace(/\n/gm, ''),
+        description: "Professors: " + professors.replace(/\n/gm, ' '),
         repeating: {
             freq: "WEEKLY",
             byDay: byDay,
@@ -79,27 +45,25 @@ function makeDateTime(date, time) {
     return datetime;
 }
 // MAIN
-function convertToIcal(schedule, isUCF) {
-    return __awaiter(this, void 0, void 0, function* () {
-        schedule = schedule.trim();
-        if (!schedule)
-            throw new SchedulerError("You inputted an empty schedule.");
-        let class_sections = parseSchedule(schedule);
-        if (!class_sections)
-            throw new SchedulerError("Couldn't find any class sections in your schedule. Please, check your schedule or contact my author.");
-        let firstSectionStartDate = class_sections[0].start;
-        let year = firstSectionStartDate.getFullYear();
-        let term = getSectionTerm(firstSectionStartDate);
-        let no_school_events;
-        if (isUCF)
-            no_school_events = yield scrap_no_school_events(year, term);
-        else
-            no_school_events = [];
-        let exdates = make_timeless_exdates(no_school_events);
-        for (let section of class_sections)
-            add_exdates(section, exdates);
-        return new ical.ICalCalendar({ name: `Classes ${term} ${year}`, timezone: TZ_NEW_YORK }).toString();
-    });
+window.convertToIcal = async function (schedule, isUCF) {
+    schedule = schedule.trim();
+    if (!schedule)
+        throw new SchedulerError("You inputted an empty schedule.");
+    let class_sections = parseSchedule(schedule);
+    if (!class_sections)
+        throw new SchedulerError("Couldn't find any class sections in your schedule. Please, check your schedule or contact my author.");
+    let firstSectionStartDate = class_sections[0].start;
+    let year = firstSectionStartDate.getFullYear();
+    let term = getSectionTerm(firstSectionStartDate);
+    let no_school_events;
+    if (isUCF)
+        no_school_events = await scrap_no_school_events(year, term);
+    else
+        no_school_events = [];
+    let exdates = make_timeless_exdates(no_school_events);
+    for (let section of class_sections)
+        add_exdates(section, exdates);
+    return ical({ name: `Classes ${term} ${year}`, timezone: TZ_NEW_YORK, events: class_sections.concat(no_school_events) }).toString();
 }
 function getSectionTerm(sectionDate) {
     let start_month = sectionDate.getMonth();
@@ -140,14 +104,14 @@ function add_exdates(icalEvent, exdates) {
 // PARSING
 function parseSchedule(schedule) {
     schedule = normalizeWhitespace(schedule);
-    console.log(schedule);
+    // console.log(schedule)
     const classNames = schedule.match(reClassName);
-    console.log(classNames);
+    // console.log(classNames)
     if (!classNames)
         throw new SchedulerError("Couldn't find any class sections in your schedule. Please, check your schedule or contact my author.");
     const classSectionBatches = schedule.split(reClassName);
-    console.log(classSectionBatches);
-    console.log(classSectionBatches.length);
+    // console.log(classSectionBatches)
+    // console.log(classSectionBatches.length)
     classSectionBatches.shift(); // classSectionBatches[0] == ''
     let all_class_sections = [];
     for (let i = 0; i < classNames.length; i++) {
@@ -181,44 +145,48 @@ function getAllRegexMatches(str, regex) {
 // SCRAPPER
 // def get_no_school_events(year, term):
 //     return [RegularEvent(**e) for e in scrap_no_school_events(year, term)]
-function scrap_no_school_events(year, term) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const url = `https://calendar.ucf.edu/${year}/${term}/no-classes/`;
-        let response;
-        try {
-            response = yield axios_1.default.get(url);
+async function scrap_no_school_events(year, term) {
+    const url = `https://calendar.ucf.edu/${year}/${term}/no-classes/`;
+    console.log(url)
+    // typeof is necessary because of this: https://github.com/microsoft/TypeScript/issues/27311
+    let response, soup;
+    try {
+        response = await fetch(url);
+        soup = new jssoup(await response.text(), false);
+    }
+    catch (exception) {
+        console.log(exception)
+        throw new SchedulerError("Couldn't connect to calendar.ucf.edu to get no-school events. Either check your internet connection and try again or uncheck 'I am a UCF student' tickbox.");
+    }
+    let raw_events = soup.findAll("tr", { "class": "vevent" });
+    let scrapped_events = [];
+    let dtstart, dtend, description;
+    for (let raw_event of raw_events) {
+        dtstart = dtend = description = null;
+        for (let elem of raw_event.findAll("abbr")) {
+            let class_ = (typeof (elem.attrs['class']) == "string") ? elem.attrs['class'] : elem.attrs['class'][0];
+            console.log(`class = ${class_}`)
+            if (class_ === "dtstart")
+                dtstart = elem.attrs['title'];
+            else if (class_ === "dtend")
+                dtend = elem.attrs['title'];
         }
-        catch (exception) {
-            throw new SchedulerError("Couldn't connect to calendar.ucf.edu to get no-school events. Either check your internet connection and try again or uncheck 'I am a UCF student' tickbox.");
+        // Sometimes it has an event with no dtstart and no dtend.
+        // I would check back on it later(UCF Cal -> no - school tag -> Study day)
+        if (dtstart === null) {
+            console.log("DTSTART = NULL")
+            continue;
         }
-        let soup = new jssoup_1.default(response.data, false);
-        let raw_events = soup.findAll("tr", { "class": "vevent" });
-        let scrapped_events = [];
-        let dtstart, dtend, description;
-        for (let raw_event of raw_events) {
-            dtstart = dtend = description = null;
-            for (let elem of raw_event.findAll("abbr")) {
-                let class_ = (elem['class'] instanceof String) ? elem['class'] : elem['class'][0];
-                if (class_ === "dtstart")
-                    dtstart = elem['title'];
-                else if (class_ === "dtend")
-                    dtend = elem['title'];
-            }
-            // Sometimes it has an event with no dtstart and no dtend.
-            // I would check back on it later(UCF Cal -> no - school tag -> Study day)
-            if (dtstart === null)
-                continue;
-            let raw_description = raw_event.find("div", { "class": "more-details" });
-            if (raw_description !== null)
-                description = raw_description.getText().trim();
-            scrapped_events.push({
-                summary: raw_event.find("span", { "class": "summary" }).getText(),
-                start: new Date(dtstart),
-                end: new Date(dtend),
-                description: description ? description : "",
-            });
-        }
-        return scrapped_events;
-    });
+        let raw_description = raw_event.find("div", { "class": "more-details" });
+        if (raw_description)
+            description = raw_description.getText().trim();
+        scrapped_events.push({
+            summary: raw_event.find("span", { "class": "summary" }).getText(),
+            start: new Date(dtstart),
+            end: new Date(dtend),
+            description: description ? description : "",
+        });
+    }
+    console.log(scrapped_events)
+    return scrapped_events;
 }
-//# sourceMappingURL=unischeduler.js.map

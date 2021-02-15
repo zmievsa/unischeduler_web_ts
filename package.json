@@ -1,0 +1,25 @@
+{
+  "name": "unischeduler_web_ts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "browserify": "^17.0.0",
+    "ical-generator": "^1.15.4",
+    "jssoup": "^0.0.12"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ovsyanka83/unischeduler_web_ts.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Ovsyanka83/unischeduler_web_ts/issues"
+  },
+  "homepage": "https://github.com/Ovsyanka83/unischeduler_web_ts#readme"
+}
