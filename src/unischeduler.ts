@@ -257,14 +257,18 @@ async function scrap_no_school_events(year: number, term: string): Promise<IcalE
 // Миллион библиотек, но ни одной рабочей. Сам реализую.
 
 function createIcalString(name: string, timezone: string, classSections: ClassSectionEvent[], noSchoolEvents: IcalEvent[]): string {
+    let ics = new ICS(timezone);
+    let tz = `;TZID=${timezone}`
+    let creationDate = ics.toDatetime(new Date()) + "Z"
     let ical = `
     BEGIN:VCALENDAR
     SUMMARY:${name}
     PRODID:-//Ovsyanka83//UnischedulerTS MIMEDIR//EN
     VERSION:2.0
+    DTSTAMP:${creationDate}
+    CREATED:${creationDate}
+    LAST-MODIFIED:${creationDate}
     `
-    let ics = new ICS(timezone);
-    let tz = `;TZID=${timezone}`
     for (let e of classSections)
         ical += `
         BEGIN:VEVENT
