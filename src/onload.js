@@ -1,3 +1,14 @@
+$(document).ready(function () {
+    const url = "http://worldtimeapi.org/api/timezone"
+    $.ajax({
+        url: url,
+        type: "GET",
+        success: function (result) {
+            for (let tz of result)
+                $("#timezone").append(new Option(tz));
+        }
+    })
+});
 function deleteErrorElement() {
     elems = document.getElementsByClassName("error");
     if (elems.length) elems[0].parentElement.removeChild(elems[0]);
@@ -24,7 +35,7 @@ function save(data, filename, filetype) {
 async function convert() {
     let schedule;
     try {
-        schedule = await convertToIcal($('textarea[name="schedule"]').val(), $('input[name="isUCF"]').prop("checked"));
+        schedule = await convertToIcal($('textarea[name="schedule"]').val(), $('input[name="isUCF"]').prop("checked"), $('#timezone').find(":selected").text());
         save(schedule, "Classes.ics", "text/calendar");
     } catch (error) {
         console.log(error)

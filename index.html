@@ -11,10 +11,7 @@
   <noscript>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
   </noscript>
-  <link rel="preload" href="css/main.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript>
-    <link rel="stylesheet" href="css/main.css">
-  </noscript>
+  <link rel="stylesheet" href="css/main.css">
   <title>Unischeduler</title>
   <link rel="shortcut icon" href="/img/favicon.ico">
   <script defer src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -85,6 +82,10 @@
           <p class="error" id="error"></p>
         </div>
         <form>
+          <label for="timezone">Your school's timezone:</label>
+          <select name="timezone" id="timezone" style="font-size: 64%">
+            <option>America/New_York</option>
+          </select>
           <p>
             <textarea rows="5" cols="60" name="schedule" autofocus required
               placeholder="Please, paste your schedule here"></textarea>

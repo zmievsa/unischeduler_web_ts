@@ -256,18 +256,19 @@ async function scrap_no_school_events(year: number, term: string): Promise<IcalE
 // Да пошли вы в жопу со своими JS-библиотеками. КТО-НИБУДЬ ВООБЩЕ МОЖЕТ РЕАЛИЗОВАТЬ ПОЛНЫЙ ФУНКЦИОНАЛ ICAL?
 // Миллион библиотек, но ни одной рабочей. Сам реализую.
 
-function createIcalString(name: string, tz: string, classSections: ClassSectionEvent[], noSchoolEvents: IcalEvent[]): string {
-    let ical = `BEGIN:VCALENDAR\nSUMMARY:${name}\nTIMEZONE:${tz}\n`
-    let ics = new ICS(tz);
+function createIcalString(name: string, timezone: string, classSections: ClassSectionEvent[], noSchoolEvents: IcalEvent[]): string {
+    let ical = `BEGIN:VCALENDAR\nSUMMARY:${name}\n`
+    let ics = new ICS(timezone);
+    let tz = `;TZID=${timezone}`
     for (let e of classSections)
         ical += `
         BEGIN:VEVENT
         SUMMARY:${e.summary}
         DESCRIPTION:${e.description}
         LOCATION:${e.location}
-        DTSTART;VALUE=DATE-TIME:${ics.toDatetime(e.start)}
-        DTEND;VALUE=DATE-TIME:${ics.toDatetime(e.end)}
-        RRULE:FREQ=WEEKLY;BYDAY=${e.rrule.byDay};INTERVAL=1;UNTIL=${ics.toDatetime(e.rrule.until)}
+        DTSTART;VALUE=DATE-TIME${tz}:${ics.toDatetime(e.start)}
+        DTEND;VALUE=DATE-TIME${tz}:${ics.toDatetime(e.end)}
+        RRULE:FREQ=WEEKLY;BYDAY=${e.rrule.byDay};INTERVAL=1;UNTIL=${ics.toDatetime(e.rrule.until)}Z
         EXDATE:${ics.toExdateList(e.rrule.exclude)}
         END:VEVENT
         `
@@ -276,13 +277,12 @@ function createIcalString(name: string, tz: string, classSections: ClassSectionE
         BEGIN:VEVENT
         SUMMARY:${e.summary}
         DESCRIPTION:${e.description}
-        DTSTART;VALUE=DATE:${ics.toDate(e.start)}
-        DTEND;VALUE=DATE:${ics.toDate(e.end)}
+        DTSTART;VALUE=DATE${tz}:${ics.toDate(e.start)}
+        DTEND;VALUE=DATE${tz}:${ics.toDate(e.end)}
         END:VEVENT
         `
     ical += "\nEND:VCALENDAR"
     return ics.normalize(ical);
-
 }
 
 // All dates passed here must be in local timezone
@@ -329,7 +329,7 @@ function pad(n: number): string {
 }
 
 function foldLines(text: string) {
-    return text.match(/[^\r\n]+/g)?.map(foldLine).join("\n");
+    return text.match(/[^\r\n]+/g)?.map(foldLine).join("\r\n");
 }
 
 function foldLine(line: string) {
@@ -341,5 +341,5 @@ function foldLine(line: string) {
         length = 74
     }
     parts.push(line)
-    return parts.join('\n ')
+    return parts.join('\r\n ')
 }
