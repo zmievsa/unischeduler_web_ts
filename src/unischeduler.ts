@@ -11,7 +11,6 @@ const reNewlines = /\n+/gm
 
 const reClassTime = /(?<hours>\d+)(?::)(?<minutes>\d+)(?<isAfterNoon>PM)?/;
 
-const TZ_UTC = "UTC"
 const TZ_NEW_YORK = "America/New_York"
 
 const NUMBER_OF_MILLIS_IN_DAY = 86400000
@@ -37,7 +36,6 @@ interface IcalEvent {
     start: Date;
     end: Date;
     description: string;
-    timezone: string;
 }
 
 interface ClassSectionEvent extends IcalEvent {
@@ -62,7 +60,6 @@ function createClassSection(
         end: dtend,
         location: location,
         description: "Professors: " + professors.replace(/\n/gm, ' '),
-        timezone: TZ_NEW_YORK,
         rrule: {
             freq: "WEEKLY",
             byDay: byDay,
@@ -96,7 +93,7 @@ function setTrueWeekday(date: Date, byday: string) {
 
 // MAIN
 // @ts-ignore
-window.convertToIcal = async function (schedule: string, isUCF: boolean) {
+window.convertToIcal = async function (schedule: string, isUCF: boolean, timezone: string) {
     schedule = schedule.trim();
     if (!schedule)
         throw new SchedulerError("You inputted an empty schedule.");
@@ -114,7 +111,7 @@ window.convertToIcal = async function (schedule: string, isUCF: boolean) {
     let exdates = make_timeless_exdates(no_school_events);
     for (let section of class_sections)
         add_exdates(section, exdates);
-    return createIcalString(`Classes ${term} ${year}`, TZ_NEW_YORK, class_sections, no_school_events)
+    return createIcalString(`Classes ${term} ${year}`, timezone, class_sections, no_school_events)
 }
 
 function getSectionTerm(sectionDate: Date): string {
@@ -251,7 +248,6 @@ async function scrap_no_school_events(year: number, term: string): Promise<IcalE
             start: start,
             end: end,
             description: description ? description : "",
-            timezone: TZ_NEW_YORK,
         });
     }
     return scrapped_events;
