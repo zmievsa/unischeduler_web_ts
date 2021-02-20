@@ -1,12 +1,7 @@
 $(document).ready(function () {
-    const url = "http://worldtimeapi.org/api/timezone"
-    $.ajax({
-        url: url,
-        type: "GET",
-        success: function (result) {
-            for (let tz of result)
-                $("#timezone").append(new Option(tz));
-        }
+    $.getJSON("static/timezones.json", function (json) {
+        for (let tz of json)
+            $("#timezone").append(new Option(tz));
     })
 });
 function deleteErrorElement() {
