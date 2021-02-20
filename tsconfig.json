@@ -1,0 +1,25 @@
+{
+	"compilerOptions": {
+		"outDir": "./dist/",
+		"noImplicitAny": true,
+		"module": "es6",
+		"target": "es6",
+		"jsx": "react",
+		"allowJs": false,
+		"moduleResolution": "node",
+		"sourceMap": true,
+	},
+	"include": [
+		"./**/*.ts"
+	],
+	"exclude": [
+		"node_modules",
+		"dist",
+		"deploy"
+	],
+	"lib": [
+		"es2017",
+		"dom",
+		"es2017.object"
+	]
+}

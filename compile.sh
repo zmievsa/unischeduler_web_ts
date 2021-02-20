@@ -1,3 +1,3 @@
 #!/bin/sh
 
-browserify js/unischeduler.js > bundle.js
+npm run build

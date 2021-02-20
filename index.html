@@ -11,7 +11,7 @@
   <title>Unischeduler</title>
   <link rel="shortcut icon" href="/img/favicon.ico">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-  <script src="bundle.js"></script>
+  <script src="dist/bundle.js"></script>
   <script>
     function deleteErrorElement() {
       elems = document.getElementsByClassName("error");
@@ -127,7 +127,7 @@
           schedule = await convertToIcal($('textarea[name="schedule"]').val(), $('input[name="isUCF"]').prop("checked"));
           save(schedule, "Classes.ics", "text/calendar");  
         } catch (error) {
-          console.log(error)
+            console.log(error)
             $('#error').text(error)
             $('#divError').prop("style", "display: inline-block;")
           }
