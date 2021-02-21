@@ -1,17 +1,13 @@
 // Good luck figuring this out!
 const reClassName = /[A-Z]{3}[A-Z]* \d+[A-Z]? - .+/g;
 const reClassSection = /(?:(?<sectionType>[A-Z][a-z]+)\n)?(?<weekdays>(?:[A-Z][a-z])+)\s+(?<startTime>\d\d?:\d\d(?:AM|PM))\s+-\s+(?<endTime>\d\d?:\d\d(?:AM|PM))\n(?<location>.+)\n(?<professors>\D+)(?<dtstart>[\d/]+)\s+-\s+(?<dtend>[\d/]+)/g;
+const reClassTime = /(?<hours>\d+)(?::)(?<minutes>\d+)(?<isAfterNoon>PM)?/;
 
 // Yes, they MUST be separate and CANNOT be combined
 // Otherwise, js can sometimes remove necessary newlines
 const reLeadingLineWhitespace = /(^\s+)/gm
 const reEndingLineWhitespace = /(\s+$)/gm
 
-const reNewlines = /\n+/gm
-
-const reClassTime = /(?<hours>\d+)(?::)(?<minutes>\d+)(?<isAfterNoon>PM)?/;
-
-const TZ_NEW_YORK = "America/New_York"
 
 const NUMBER_OF_MILLIS_IN_DAY = 86400000
 
@@ -28,19 +24,20 @@ interface RRule {
     freq: string;
     byDay: string;
     until: Date;
-    exclude?: Date[];
 }
 
 interface IcalEvent {
     summary: string;
-    start: Date;
-    end: Date;
+    dtstart: Date;
+    dtend: Date;
     description: string;
 }
 
 interface ClassSectionEvent extends IcalEvent {
     location: string;
-    rrule: RRule
+    exclude: Date[];
+    rrule: RRule;
+
 }
 
 function createClassSection(
@@ -56,10 +53,11 @@ function createClassSection(
     until.setUTCHours(0, 0, 0, 0);
     return {
         summary: `${className} (${type})`,
-        start: dtstart,
-        end: dtend,
+        dtstart: dtstart,
+        dtend: dtend,
         location: location,
         description: "Professors: " + professors.replace(/\n/gm, ' '),
+        exclude: [],
         rrule: {
             freq: "WEEKLY",
             byDay: byDay,
@@ -92,6 +90,9 @@ function setTrueWeekday(date: Date, byday: string) {
 
 
 // MAIN
+
+// We assign it to window to be able to use it from html/js on the webpage.
+// The reason we need it is because bundlers such as webpack don't leak any info about bundled packages.
 // @ts-ignore
 window.convertToIcal = async function (schedule: string, isUCF: boolean, timezone: string) {
     schedule = schedule.trim();
@@ -100,7 +101,7 @@ window.convertToIcal = async function (schedule: string, isUCF: boolean, timezon
     let class_sections = parseSchedule(schedule);
     if (!class_sections)
         throw new SchedulerError("Couldn't find any class sections in your schedule. Please, check your schedule or contact my author.");
-    let firstSectionStartDate = class_sections[0].start;
+    let firstSectionStartDate = class_sections[0].dtstart;
     let year = firstSectionStartDate.getUTCFullYear();
     let term = getSectionTerm(firstSectionStartDate);
     let no_school_events: IcalEvent[];
@@ -128,15 +129,15 @@ function getSectionTerm(sectionDate: Date): string {
 function make_timeless_exdates(no_school_events: IcalEvent[]): Date[] {
     let dates = [];
     for (let noSchoolEvent of no_school_events) {
-        let day_count = (noSchoolEvent.end.getTime() - noSchoolEvent.start.getTime()) / NUMBER_OF_MILLIS_IN_DAY;
+        let day_count = (noSchoolEvent.dtend.getTime() - noSchoolEvent.dtstart.getTime()) / NUMBER_OF_MILLIS_IN_DAY;
         if (day_count > 1)
             for (let i = 0; i < day_count + 1; i++) {
-                let newDate = new Date(noSchoolEvent.start);
+                let newDate = new Date(noSchoolEvent.dtstart);
                 newDate.setUTCDate(newDate.getUTCDate() + i); // This might need to be converted to UTC
                 dates.push(newDate);
             }
         else
-            dates.push(noSchoolEvent.start);
+            dates.push(noSchoolEvent.dtstart);
     }
     console.log(dates.map((d) => {
         return d.toUTCString()
@@ -146,8 +147,8 @@ function make_timeless_exdates(no_school_events: IcalEvent[]): Date[] {
 
 // If DTSTART is a date-time value then EXDATEs must also be date-times (c) RFC5545
 function add_exdates(icalEvent: ClassSectionEvent, exdates: Date[]) {
-    let hours = icalEvent.start.getUTCHours();
-    let minutes = icalEvent.start.getUTCMinutes();
+    let hours = icalEvent.dtstart.getUTCHours();
+    let minutes = icalEvent.dtstart.getUTCMinutes();
     let exdatesCopies = [];
     for (let exdate of exdates) {
         if (!icalEvent.rrule.byDay.toLowerCase().includes(exdate.toUTCString().slice(0, 2).toLowerCase()))
@@ -157,7 +158,7 @@ function add_exdates(icalEvent: ClassSectionEvent, exdates: Date[]) {
         newDate.setUTCMinutes(minutes);
         exdatesCopies.push(newDate);
     }
-    icalEvent.rrule.exclude = exdatesCopies;
+    icalEvent.exclude = exdatesCopies;
 }
 // PARSING
 
@@ -193,7 +194,7 @@ function parseSchedule(schedule: string): ClassSectionEvent[] {
 }
 
 function normalizeWhitespace(str: string): string {
-    return str.replace(reLeadingLineWhitespace, '').replace(reEndingLineWhitespace, '').replace(reNewlines, "\n");
+    return str.replace(reLeadingLineWhitespace, '').replace(reEndingLineWhitespace, '').replace(/\n+/gm, "\n");
 }
 
 function getAllRegexMatches(str: string, regex: RegExp): RegExpExecArray[] {
@@ -245,8 +246,8 @@ async function scrap_no_school_events(year: number, term: string): Promise<IcalE
             end = new Date(dtend)
         scrapped_events.push({
             summary: summary,
-            start: start,
-            end: end,
+            dtstart: start,
+            dtend: end,
             description: description ? description : "",
         });
     }
@@ -255,6 +256,7 @@ async function scrap_no_school_events(year: number, term: string): Promise<IcalE
 
 // Да пошли вы в жопу со своими JS-библиотеками. КТО-НИБУДЬ ВООБЩЕ МОЖЕТ РЕАЛИЗОВАТЬ ПОЛНЫЙ ФУНКЦИОНАЛ ICAL?
 // Миллион библиотек, но ни одной рабочей. Сам реализую.
+// P.s. https://xkcd.com/927/
 
 function createIcalString(name: string, timezone: string, classSections: ClassSectionEvent[], noSchoolEvents: IcalEvent[]): string {
     let ics = new ICS(timezone);
@@ -275,10 +277,10 @@ function createIcalString(name: string, timezone: string, classSections: ClassSe
         SUMMARY:${e.summary}
         DESCRIPTION:${e.description}
         LOCATION:${e.location}
-        DTSTART;VALUE=DATE-TIME${tz}:${ics.toDatetime(e.start)}
-        DTEND;VALUE=DATE-TIME${tz}:${ics.toDatetime(e.end)}
+        DTSTART;VALUE=DATE-TIME${tz}:${ics.toDatetime(e.dtstart)}
+        DTEND;VALUE=DATE-TIME${tz}:${ics.toDatetime(e.dtend)}
         RRULE:FREQ=WEEKLY;BYDAY=${e.rrule.byDay};INTERVAL=1;UNTIL=${ics.toDatetime(e.rrule.until)}Z
-        EXDATE:${ics.toExdateList(e.rrule.exclude)}
+        EXDATE:${ics.toExdateList(e.exclude)}
         END:VEVENT
         `
     for (let e of noSchoolEvents)
@@ -286,16 +288,14 @@ function createIcalString(name: string, timezone: string, classSections: ClassSe
         BEGIN:VEVENT
         SUMMARY:${e.summary}
         DESCRIPTION:${e.description}
-        DTSTART;VALUE=DATE${tz}:${ics.toDate(e.start)}
-        DTEND;VALUE=DATE${tz}:${ics.toDate(e.end)}
+        DTSTART;VALUE=DATE${tz}:${ics.toDate(e.dtstart)}
+        DTEND;VALUE=DATE${tz}:${ics.toDate(e.dtend)}
         END:VEVENT
         `
     ical += "\nEND:VCALENDAR"
     return ics.normalize(ical);
 }
 
-// All dates passed here must be in local timezone
-// All moments passed here must be in UTC
 class ICS {
     timezone: string
 
@@ -309,10 +309,12 @@ class ICS {
     }
 
     toDate(dt: Date): string {
+        // 20210411
         return dt.getUTCFullYear() + pad(dt.getUTCMonth() + 1) + pad(dt.getUTCDate());
     }
 
     toTime(dt: Date): string {
+        // 093000
         return pad(dt.getUTCHours()) + pad(dt.getUTCMinutes()) + pad(dt.getUTCSeconds());
     }
 
@@ -328,7 +330,6 @@ class ICS {
     }
 
 }
-
 
 function pad(n: number): string {
     if (n < 10)
