@@ -106,7 +106,7 @@ window.convertToIcal = async function (schedule: string, isUCF: boolean, timezon
     let term = getSectionTerm(firstSectionStartDate);
     let no_school_events: IcalEvent[];
     if (isUCF)
-        no_school_events = await scrap_no_school_events(year, term);
+        no_school_events = await getUCFNoSchoolEvents(year, term);
     else
         no_school_events = [];
     let exdates = make_timeless_exdates(no_school_events);
@@ -133,7 +133,7 @@ function make_timeless_exdates(no_school_events: IcalEvent[]): Date[] {
         if (day_count > 1)
             for (let i = 0; i < day_count + 1; i++) {
                 let newDate = new Date(noSchoolEvent.dtstart);
-                newDate.setUTCDate(newDate.getUTCDate() + i); // This might need to be converted to UTC
+                newDate.setUTCDate(newDate.getUTCDate() + i);
                 dates.push(newDate);
             }
         else
@@ -205,53 +205,32 @@ function getAllRegexMatches(str: string, regex: RegExp): RegExpExecArray[] {
     return matches;
 }
 
-// SCRAPPER
-
-async function scrap_no_school_events(year: number, term: string): Promise<IcalEvent[]> {
-    const url = `https://calendar.ucf.edu/${year}/${term}/no-classes/`;
-    // typeof is necessary because of this: https://github.com/microsoft/TypeScript/issues/27311
-    let response: Response, html: HTMLDocument;
-    try {
-        response = await fetch(url);
-        let parser = new DOMParser();
-        html = parser.parseFromString(await response.text(), 'text/html');
-    }
-    catch (exception) {
-        throw new SchedulerError("Couldn't connect to calendar.ucf.edu to get no-school events. Either check your internet connection and try again or uncheck 'I am a UCF student' tickbox.");
-    }
-    let raw_events = html.querySelectorAll('tr.vevent')
-    let scrapped_events = [];
-    let start: Date, end: Date, dtstart: string, dtend: string, description: string, summary: string;
-    for (let raw_event of raw_events) {
-        start = end = dtstart = dtend = description = summary = null;
-        for (let elem of raw_event.querySelectorAll("abbr")) {
-            if (elem.className.includes("dtstart"))
-                dtstart = elem.title;
-            else if (elem.className.includes("dtend"))
-                dtend = elem.title;
-        }
-        summary = raw_event.querySelector("span.summary").textContent
+async function getUCFNoSchoolEvents(year: number, term: string): Promise<IcalEvent[]> {
+    const json = await (await fetch(`https://calendar.ucf.edu/json/${year}/${term}`)).json()
+    let events = []
+    for (let event of json.terms[0].events) {
         // Sometimes it has an event with no dtstart and no dtend called "Study day"
-        if (!dtstart || !summary)
-            continue;
-        start = new Date(dtstart);
-        let raw_description = raw_event.querySelector("div.more-details");
-        if (raw_description)
-            description = raw_description.textContent.trim();
-        if (!dtend) {
-            end = new Date(start.getTime())
-            end.setUTCDate(end.getUTCDate() + 1);
+        // This check also protects us against events with no summaries
+        if (event.tags && event.tags.includes("no-classes") && event.dtstart && event.summary) {
+            let dtstart = new Date(event.dtstart);
+            let dtend: Date;
+            if (!event.dtend) {
+                dtend = new Date(dtstart.getTime());
+                dtend.setUTCDate(dtend.getUTCDate() + 1);
+            }
+            else
+                dtend = new Date(event.dtend);
+            let description = event.description || "";
+            description = description.trim();
+            events.push({
+                summary: event.summary.trim(),
+                dtstart: dtstart,
+                dtend: dtend,
+                description: description,
+            });
         }
-        else
-            end = new Date(dtend)
-        scrapped_events.push({
-            summary: summary,
-            dtstart: start,
-            dtend: end,
-            description: description ? description : "",
-        });
     }
-    return scrapped_events;
+    return events;
 }
 
 // Да пошли вы в жопу со своими JS-библиотеками. КТО-НИБУДЬ ВООБЩЕ МОЖЕТ РЕАЛИЗОВАТЬ ПОЛНЫЙ ФУНКЦИОНАЛ ICAL?
