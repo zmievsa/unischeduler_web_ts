@@ -11,17 +11,7 @@ const reEndingLineWhitespace = /(\s+$)/gm
 
 const NUMBER_OF_MILLIS_IN_DAY = 86400000
 
-class SchedulerError extends Error {
-    constructor(m: string) {
-        super(m);
-
-        // Set the prototype explicitly.
-        Object.setPrototypeOf(this, SchedulerError.prototype);
-    }
-}
-
 interface RRule {
-    freq: string;
     byDay: string;
     until: Date;
 }
@@ -59,7 +49,6 @@ function createClassSection(
         description: "Professors: " + professors.replace(/\n/gm, ' '),
         exclude: [],
         rrule: {
-            freq: "WEEKLY",
             byDay: byDay,
             until: until,
         }
@@ -69,7 +58,7 @@ function createClassSection(
 function makeDateTime(date: string, time: string) {
     let timeInfo = reClassTime.exec(time).groups;
     if (!timeInfo)
-        throw new SchedulerError("TIMEINFO ERROR");
+        throw new Error(`Incorrect time format: ${time}`);
     let datetime = new Date(date);
     let hours = parseInt(timeInfo.hours)
     let noonIncrement: number = 0;
@@ -97,10 +86,10 @@ function setTrueWeekday(date: Date, byday: string) {
 window.convertToIcal = async function (schedule: string, isUCF: boolean, timezone: string) {
     schedule = schedule.trim();
     if (!schedule)
-        throw new SchedulerError("You inputted an empty schedule.");
+        throw new Error("You inputted an empty schedule.");
     let class_sections = parseSchedule(schedule);
     if (!class_sections)
-        throw new SchedulerError("Couldn't find any class sections in your schedule. Please, check your schedule or contact my author.");
+        throw new Error("Couldn't find any class sections in your schedule. Please, check your schedule or contact my author.");
     let firstSectionStartDate = class_sections[0].dtstart;
     let year = firstSectionStartDate.getUTCFullYear();
     let term = getSectionTerm(firstSectionStartDate);
@@ -166,14 +155,16 @@ function parseSchedule(schedule: string): ClassSectionEvent[] {
     schedule = normalizeWhitespace(schedule);
     const classNames = schedule.match(reClassName)
     if (!classNames)
-        throw new SchedulerError("Couldn't find any class sections in your schedule. Please, check your schedule or contact my author.")
+        throw new Error("Couldn't find any class sections in your schedule. Please, check your schedule or contact my author.")
     const classSectionBatches = schedule.split(reClassName);
     classSectionBatches.shift() // classSectionBatches[0] == ''
     let all_class_sections = [];
     for (let i = 0; i < classNames.length; i++) {
         let rawSectionBatch = classSectionBatches[i];
-        // TODO: What if we get an online class without datetimes? Is the regex enough to handle such cases?
+        // In case we get a class without class times, handling it seems unnecessary as it is most likely a fully online
+        // class.
         // TODO: What if the class info somehow contains dropped/withdrawn but in some other section? Ex: Prof name
+        // Idea: Drop one of your classes at the beginning of some semester and see if it works.
         if (rawSectionBatch.includes("Dropped") || rawSectionBatch.includes("Withdrawn"))
             continue;
         let sectionBatch = getAllRegexMatches(rawSectionBatch, reClassSection)
@@ -211,7 +202,8 @@ async function getUCFNoSchoolEvents(year: number, term: string): Promise<IcalEve
         json = await (await fetch(`https://calendar.ucf.edu/json/${year}/${term}`)).json()
     }
     catch (exception) {
-        throw new SchedulerError("Couldn't connect to calendar.ucf.edu to get no-school events. Either check your internet connection and try again or uncheck 'I am a UCF student' tickbox.");
+        console.log(exception)
+        throw new Error("Couldn't connect to calendar.ucf.edu to get no-school events. Either check your internet connection and try again or uncheck 'I am a UCF student' tickbox.");
     }
     let events = []
     for (let event of json.terms[0].events) {
@@ -250,7 +242,7 @@ function createIcalString(name: string, timezone: string, classSections: ClassSe
     let ical = `
     BEGIN:VCALENDAR
     SUMMARY:${name}
-    PRODID:-//Ovsyanka83//UnischedulerTS MIMEDIR//EN
+    PRODID:-//Ovsyanka83//UnischedulerTS//EN
     VERSION:2.0
     DTSTAMP:${creationDate}
     CREATED:${creationDate}
