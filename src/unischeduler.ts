@@ -206,7 +206,13 @@ function getAllRegexMatches(str: string, regex: RegExp): RegExpExecArray[] {
 }
 
 async function getUCFNoSchoolEvents(year: number, term: string): Promise<IcalEvent[]> {
-    const json = await (await fetch(`https://calendar.ucf.edu/json/${year}/${term}`)).json()
+    let json;
+    try {
+        json = await (await fetch(`https://calendar.ucf.edu/json/${year}/${term}`)).json()
+    }
+    catch (exception) {
+        throw new SchedulerError("Couldn't connect to calendar.ucf.edu to get no-school events. Either check your internet connection and try again or uncheck 'I am a UCF student' tickbox.");
+    }
     let events = []
     for (let event of json.terms[0].events) {
         // Sometimes it has an event with no dtstart and no dtend called "Study day"
@@ -220,7 +226,7 @@ async function getUCFNoSchoolEvents(year: number, term: string): Promise<IcalEve
             }
             else
                 dtend = new Date(event.dtend);
-            let description = event.description || "";
+            let description: string = event.description || "";
             description = description.trim();
             events.push({
                 summary: event.summary.trim(),
