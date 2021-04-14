@@ -1,3 +1,6 @@
+// TODO Either implement timezones or give up: http://tzurl.sgp1.cdn.digitaloceanspaces.com/index.html, https://icalendar.org
+// P.s. I recommend giving up. This topic is so insanely hard that you don't want to handle it, trust me.
+
 // Good luck figuring this out!
 const reClassName = /[A-Z]{3}[A-Z]* \d+[A-Z]? - .+/g;
 const reClassSection = /(?:(?<sectionType>[A-Z][a-z]+)\n)?(?<weekdays>(?:[A-Z][a-z])+)\s+(?<startTime>\d\d?:\d\d(?:AM|PM))\s+-\s+(?<endTime>\d\d?:\d\d(?:AM|PM))\n(?<location>.+)\n(?<professors>\D+)(?<dtstart>[\d/]+)\s+-\s+(?<dtend>[\d/]+)/g;
@@ -34,7 +37,7 @@ function createClassSection(
     className: string, type: string, weekdays: string,
     startTime: string, endTime: string, location: string,
     professors: string, startDate: string, endDate: string): ClassSectionEvent {
-    let byDay = weekdays.match(/../g).toString();
+    let byDay = weekdays.match(/../g).map((s) => { return s.toUpperCase() }).toString();
     let dtstart = makeDateTime(startDate, startTime);
     setTrueWeekday(dtstart, byDay);
     let dtend = makeDateTime(startDate, endTime);
@@ -241,28 +244,33 @@ function createIcalString(name: string, timezone: string, classSections: ClassSe
     let creationDate = ics.toDatetime(new Date()) + "Z"
     let ical = `
     BEGIN:VCALENDAR
-    SUMMARY:${name}
-    PRODID:-//Ovsyanka83//UnischedulerTS//EN
     VERSION:2.0
-    DTSTAMP:${creationDate}
+    METHOD:REQUEST
+    PRODID:-//Ovsyanka83//UnischedulerTS//EN
+    SUMMARY:${name}
+    DTSTAMP:${creationDate} 
     CREATED:${creationDate}
     LAST-MODIFIED:${creationDate}
     `
     for (let e of classSections)
         ical += `
         BEGIN:VEVENT
+        UID:${ics.uid(e.dtstart)}
+        DTSTAMP:${ics.dtStamp}
         SUMMARY:${e.summary}
         DESCRIPTION:${e.description}
         LOCATION:${e.location}
         DTSTART;VALUE=DATE-TIME${tz}:${ics.toDatetime(e.dtstart)}
         DTEND;VALUE=DATE-TIME${tz}:${ics.toDatetime(e.dtend)}
         RRULE:FREQ=WEEKLY;BYDAY=${e.rrule.byDay};INTERVAL=1;UNTIL=${ics.toDatetime(e.rrule.until)}Z
-        EXDATE:${ics.toExdateList(e.exclude)}
+        ${ics.exdateField(e.exclude)}
         END:VEVENT
         `
     for (let e of noSchoolEvents)
         ical += `
         BEGIN:VEVENT
+        UID:${ics.uid(e.dtstart)}
+        DTSTAMP:${ics.dtStamp}
         SUMMARY:${e.summary}
         DESCRIPTION:${e.description}
         DTSTART;VALUE=DATE${tz}:${ics.toDate(e.dtstart)}
@@ -275,9 +283,11 @@ function createIcalString(name: string, timezone: string, classSections: ClassSe
 
 class ICS {
     timezone: string
+    dtStamp: string
 
     constructor(timezone: string) {
         this.timezone = timezone;
+        this.dtStamp = this.toDatetime(new Date()) + "Z";
     }
 
     toDatetime(dt: Date): string {
@@ -295,6 +305,14 @@ class ICS {
         return pad(dt.getUTCHours()) + pad(dt.getUTCMinutes()) + pad(dt.getUTCSeconds());
     }
 
+    exdateField(exdates: Date[]) {
+        let exdateList = this.toExdateList(exdates);
+        if (exdateList)
+            return "EXDATE:" + exdateList;
+        else
+            return "";
+    }
+
     toExdateList(dates: Date[]): string {
         // EXDATE:20210118T090000Z,20210411T090000Z,20210412T090000Z
         return dates.map(this.toDatetime, this).join(",")
@@ -304,6 +322,11 @@ class ICS {
     //  trailing whitespace, blank lines, or lines longer than 75 chars
     normalize(ical: string): string {
         return foldLines(normalizeWhitespace(ical))
+    }
+
+    uid(dt: Date) {
+        // I know that this uid is weird and unsafe but it gets the job done without extra dependencies
+        return `${this.dtStamp}-${this.toDatetime(dt)}-${randrange(6).join('')}@oatmeal.cc`
     }
 
 }
@@ -329,4 +352,11 @@ function foldLine(line: string) {
     }
     parts.push(line)
     return parts.join('\r\n ')
+}
+
+function randrange(rangeSize: number): number[] {
+    let range: number[] = new Array(rangeSize);
+    for (let i = 0; i < rangeSize; i++)
+        range.push(Math.floor(Math.random() * Math.floor(10)))
+    return range;
 }
